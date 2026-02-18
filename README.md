@@ -1,93 +1,203 @@
-# From CSV To Database
+# From CSV to Database — ETL Pipeline
 
+A teaching example that loads a large CSV file into **PostgreSQL** and/or **MongoDB**, structured around clean code and SOLID principles.
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Project structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.lnu.se/1dv027/content/examples/from-csv-to-database.git
-git branch -M main
-git push -uf origin main
+.
+├── main.py                   # CLI entry point
+├── Dockerfile                # Container image for the ETL app
+├── docker-compose.yml        # Local dev — databases only
+├── docker-compose.prod.yml   # Production — databases + seed service
+├── seed/
+│   └── customers.csv         # Small sample (committed to repo)
+├── data/                     # ⬅ Place the large CSV here (gitignored)
+├── src/
+│   ├── config.py             # Environment-based configuration
+│   ├── extractor.py          # Chunked CSV reading (Extract)
+│   ├── transformer.py        # Data cleaning functions (Transform)
+│   ├── pipeline.py           # ETL orchestrator
+│   └── loaders/
+│       ├── base.py           # Abstract Loader interface
+│       ├── sql_loader.py     # SQLAlchemy implementation
+│       └── mongo_loader.py   # PyMongo implementation
+├── scripts/
+│   └── generate_csv.py       # Optional: generate synthetic test data
+├── pyproject.toml
+└── .env.example
 ```
 
-## Integrate with your tools
+## SOLID principles in practice
 
-* [Set up project integrations](https://gitlab.lnu.se/1dv027/content/examples/from-csv-to-database/-/settings/integrations)
+| Principle | Where it shows up |
+|---|---|
+| **Single Responsibility** | Each module handles exactly one concern (extract, transform, or load). |
+| **Open / Closed** | Adding a new database target means creating a new `Loader` subclass — no existing code changes. |
+| **Liskov Substitution** | `SqlLoader` and `MongoLoader` are interchangeable wherever `Loader` is expected. |
+| **Interface Segregation** | The `Loader` base class exposes only `load()` and `close()` — nothing more. |
+| **Dependency Inversion** | `pipeline.run()` accepts `list[Loader]`, never importing a concrete database client. |
 
-## Collaborate with your team
+## Prerequisites
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 
-## Test and Deploy
+## Data file
 
-Use the built-in continuous integration in GitLab.
+A small sample dataset is included in `seed/customers.csv` so the project works out of the box.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+**For the full exercise**, download the large dataset from Moodle and place it in the `data/` directory:
 
-***
+```
+data/customers.csv    # ~50 MB, 500K+ rows
+```
 
-# Editing this README
+Then update `CSV_PATH` in your `.env` file:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```
+CSV_PATH=data/customers.csv
+```
 
-## Suggestions for a good README
+The `data/` directory is gitignored — large files should never be committed to the repository.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## Local development
 
-## Name
-Choose a self-explaining name for your project.
+Run the Python pipeline on your machine while the databases run in Docker.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```bash
+# 1. Install dependencies (creates .venv automatically)
+uv sync
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+# 2. Start the databases
+docker compose up -d
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+# 3. Configure (copy and edit)
+cp .env.example .env
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+# 4. Seed the databases
+uv run python main.py               # load to both SQL and MongoDB
+uv run python main.py --target sql   # SQL only
+uv run python main.py --target mongo # MongoDB only
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+# Stop the databases when done
+docker compose down            # keeps data in volumes
+docker compose down -v         # removes data too
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+By default the pipeline loads `seed/customers.csv`. To use the large dataset from Moodle:
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+# Either edit .env (CSV_PATH=data/customers.csv) or pass it inline:
+CSV_PATH=data/customers.csv uv run python main.py
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## Production / VPS deployment
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Everything runs inside Docker — no Python or uv needed on the host.
+The large CSV file is **not** baked into the Docker image. Instead, the `data/` directory on the host is mounted into the container as a read-only volume — the container reads the file directly from disk without copying it.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 1. Upload the data file
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+The large CSV needs to end up in the `data/` directory on the server. There are several ways to get it there.
 
-## License
-For open source projects, say how it is licensed.
+**Option A — Copy from your local machine via SSH:**
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+# Make sure the data/ directory exists on the server
+ssh user@your-server "mkdir -p ~/from-csv-to-database/data"
+
+# Copy the file (replace user and your-server with your actual credentials)
+scp /path/to/customers.csv user@your-server:~/from-csv-to-database/data/customers.csv
+```
+
+If you're using an SSH key (`.pem` file) instead of a password:
+
+```bash
+scp -i ~/.ssh/your-key.pem /path/to/customers.csv user@your-server:~/from-csv-to-database/data/
+```
+
+**Option B — Download directly on the server from a remote URL:**
+
+If the file is hosted somewhere (e.g. AWS S3, a shared link, or your university's file server), you can download it straight to the VPS without going through your local machine:
+
+```bash
+ssh user@your-server
+cd ~/from-csv-to-database
+mkdir -p data
+
+# From a public URL
+curl -o data/customers.csv https://example.com/customers.csv
+
+# From AWS S3 (requires aws cli configured on the server)
+aws s3 cp s3://your-bucket/customers.csv data/customers.csv
+```
+
+This is faster for large files since data goes directly to the server instead of routing through your laptop.
+
+### 2. Start the databases
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+This starts **PostgreSQL** and **MongoDB** with health checks. They stay running in the background.
+
+### 3. Seed the databases (run once)
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm seed
+```
+
+The seed service mounts `./data` from the host, waits for both databases to be healthy, loads the CSV, then exits. Nothing is copied into the image.
+
+### 4. Verify
+
+```bash
+# Check PostgreSQL
+docker compose -f docker-compose.prod.yml exec postgres \
+  psql -U etl_user -d etl_demo -c "SELECT count(*) FROM customers;"
+
+# Check MongoDB
+docker compose -f docker-compose.prod.yml exec mongo \
+  mongosh --quiet --eval "db.getSiblingDB('etl_demo').customers.countDocuments()"
+```
+
+### Seeding via CI/CD
+
+Add a step to your pipeline that runs after deployment:
+
+```yaml
+# GitLab CI example
+seed-database:
+  stage: deploy
+  script:
+    - docker compose -f docker-compose.prod.yml up -d
+    - docker compose -f docker-compose.prod.yml run --rm seed
+  only:
+    - main
+  when: manual   # run once, not on every push
+```
+
+### Re-seeding or tearing down
+
+```bash
+# Re-seed (rebuild to pick up code changes)
+docker compose -f docker-compose.prod.yml run --rm --build seed
+
+# View seed logs
+docker compose -f docker-compose.prod.yml logs seed
+
+# Tear everything down
+docker compose -f docker-compose.prod.yml down      # keeps data
+docker compose -f docker-compose.prod.yml down -v    # removes data too
+```
+
+## Key design decisions
+
+- **Chunked reading** — the CSV is streamed in configurable chunks so files larger than available RAM can be processed.
+- **Context-manager support** — loaders implement `__enter__`/`__exit__` for automatic resource cleanup.
+- **Composable transforms** — each transform is a pure function `DataFrame → DataFrame`, easy to test and reorder.
+- **Environment-based config** — secrets stay out of source code; different environments just set different env vars.
+- **Two compose files** — `docker-compose.yml` for local dev (databases only, fast iteration), `docker-compose.prod.yml` for deployment (everything containerized).
+- **Seed data in the repo** — `seed/customers.csv` is a small committed sample so the project works immediately. The large dataset is distributed separately and kept out of version control.

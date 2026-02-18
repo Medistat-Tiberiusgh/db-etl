@@ -1,0 +1,12 @@
+[project]
+name = "from-csv-to-database"
+version = "0.1.0"
+description = "ETL pipeline example — CSV to PostgreSQL and MongoDB"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.0",
+    "sqlalchemy>=2.0",
+    "pymongo>=4.0",
+    "psycopg2-binary>=2.9",
+    "python-dotenv>=1.0",
+]
