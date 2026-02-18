@@ -133,8 +133,6 @@ curl -o data/customers.csv https://example.com/customers.csv
 aws s3 cp s3://your-bucket/customers.csv data/customers.csv
 ```
 
-This is faster for large files since data goes directly to the server instead of routing through your laptop.
-
 ### 2. Start the databases
 
 ```bash
