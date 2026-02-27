@@ -16,6 +16,7 @@ class MongoLoader(Loader):
     def __init__(self, uri: str, database: str, collection: str) -> None:
         self._client: MongoClient = MongoClient(uri)
         self._collection = self._client[database][collection]
+        self._total = 0
 
     def load(self, df: pd.DataFrame) -> None:
         df = df.where(pd.notnull(df), None)
@@ -23,7 +24,8 @@ class MongoLoader(Loader):
         if not records:
             return
         self._collection.insert_many(records)
-        logger.info("Inserted %d documents into MongoDB", len(records))
+        self._total += len(records)
+        logger.info("Inserted %d documents into MongoDB (total %d)", len(records), self._total)
 
     def close(self) -> None:
         self._client.close()
