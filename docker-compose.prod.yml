@@ -1,19 +1,24 @@
 services:
   postgres:
     image: postgres:16
+    env_file: .env
     environment:
-      POSTGRES_USER: etl_user
-      POSTGRES_PASSWORD: etl_pass
-      POSTGRES_DB: etl_demo
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U etl_user -d etl_demo"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 3s
       retries: 10
 
   mongo:
     image: mongo:7
+    ports:
+      - "${MONGO_PORT}:27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -23,15 +28,12 @@ services:
 
   seed:
     build: .
+    env_file: .env
     environment:
-      CSV_PATH: data/customers.csv
-      SQL_URI: postgresql://etl_user:etl_pass@postgres:5432/etl_demo
-      SQL_TABLE: customers
-      MONGO_URI: mongodb://mongo:27017/
-      MONGO_DB: etl_demo
-      MONGO_COLLECTION: customers
+      DB_HOST: postgres
+      MONGO_HOST: mongo
     volumes:
-      - ./data:/app/data:ro
+      - ./data:/data:ro
     depends_on:
       postgres:
         condition: service_healthy

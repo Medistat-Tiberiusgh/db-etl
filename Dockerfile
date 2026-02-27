@@ -8,7 +8,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY src/ src/
-COPY seed/ seed/
 COPY main.py .
 
 ENTRYPOINT ["uv", "run", "python", "main.py"]
