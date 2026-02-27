@@ -26,7 +26,7 @@ class MongoConfig:
 
 @dataclass(frozen=True)
 class EtlConfig:
-    csv_path: str = "seed/customers.csv"
+    csv_path: str
     chunk_size: int = 5_000
     sql: SqlConfig = field(default_factory=lambda: SqlConfig(uri=""))
     mongo: MongoConfig = field(default_factory=lambda: MongoConfig(uri=""))
@@ -37,7 +37,7 @@ def load_config() -> EtlConfig:
     load_dotenv()
 
     return EtlConfig(
-        csv_path=os.environ.get("CSV_PATH", "seed/customers.csv"),
+        csv_path=f"/data/{os.environ['CSV_FILENAME']}",
         chunk_size=int(os.environ.get("CHUNK_SIZE", "5000")),
         sql=SqlConfig(
             uri=os.environ.get("SQL_URI", "postgresql://etl_user:etl_pass@localhost:5432/etl_demo"),
