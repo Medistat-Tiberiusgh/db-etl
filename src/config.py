@@ -14,19 +14,17 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class SqlConfig:
     uri: str = field(repr=False)
-    table: str = "customers"
 
 
 @dataclass(frozen=True)
 class MongoConfig:
     uri: str = field(repr=False)
-    database: str = "etl_demo"
-    collection: str = "customers"
+    database: str
 
 
 @dataclass(frozen=True)
 class EtlConfig:
-    csv_path: str
+    data_dir: str
     chunk_size: int = 5_000
     sql: SqlConfig = field(default_factory=lambda: SqlConfig(uri=""))
     mongo: MongoConfig = field(default_factory=lambda: MongoConfig(uri=""))
@@ -36,16 +34,15 @@ def load_config() -> EtlConfig:
     """Build configuration from environment variables."""
     load_dotenv()
 
+    sql_uri = (
+        f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
+        f"@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
+    )
+    mongo_uri = f"mongodb://{os.environ['MONGO_HOST']}:{os.environ['MONGO_PORT']}/"
+
     return EtlConfig(
-        csv_path=f"/data/{os.environ['CSV_FILENAME']}",
+        data_dir=os.environ.get("DATA_DIR", "/data"),
         chunk_size=int(os.environ.get("CHUNK_SIZE", "5000")),
-        sql=SqlConfig(
-            uri=os.environ.get("SQL_URI", "postgresql://etl_user:etl_pass@localhost:5432/etl_demo"),
-            table=os.environ.get("SQL_TABLE", "customers"),
-        ),
-        mongo=MongoConfig(
-            uri=os.environ.get("MONGO_URI", "mongodb://localhost:27017/"),
-            database=os.environ.get("MONGO_DB", "etl_demo"),
-            collection=os.environ.get("MONGO_COLLECTION", "customers"),
-        ),
+        sql=SqlConfig(uri=sql_uri),
+        mongo=MongoConfig(uri=mongo_uri, database=os.environ["MONGO_DB"]),
     )

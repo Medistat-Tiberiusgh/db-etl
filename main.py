@@ -1,18 +1,17 @@
 """
 Entry point for the CSV-to-Database ETL pipeline.
 
-Usage:
-    # Load to both SQL and MongoDB (default)
-    python main.py
+Loads every *.csv file found in DATA_DIR into its own table,
+using the filename (without extension) as the table name.
 
-    # Load to a single target
+Usage:
+    python main.py
     python main.py --target sql
-    python main.py --target mongo
 """
 
 import argparse
 import logging
-import sys
+from pathlib import Path
 
 from src.config import load_config
 from src.loaders import MongoLoader, SqlLoader, Loader
@@ -20,14 +19,14 @@ from src.pipeline import run
 from src.transformer import apply_transforms
 
 
-def _build_loaders(target: str, config) -> list[Loader]:
-    """Instantiate the requested loader(s) based on the CLI target flag."""
+def _build_loaders(target: str, config, table: str) -> list[Loader]:
+    """Instantiate the requested loader(s) for a single CSV file."""
     factories = {
-        "sql": lambda: SqlLoader(uri=config.sql.uri, table=config.sql.table),
+        "sql": lambda: SqlLoader(uri=config.sql.uri, table=table),
         "mongo": lambda: MongoLoader(
             uri=config.mongo.uri,
             database=config.mongo.database,
-            collection=config.mongo.collection,
+            collection=table,
         ),
     }
 
@@ -55,20 +54,29 @@ def main() -> None:
         format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
     )
 
+    log = logging.getLogger(__name__)
     config = load_config()
-    loaders = _build_loaders(args.target, config)
+    csv_files = sorted(Path(config.data_dir).glob("*.csv"))
 
-    try:
-        total = run(
-            csv_path=config.csv_path,
-            chunk_size=config.chunk_size,
-            loaders=loaders,
-            transform=apply_transforms,
-        )
-        logging.getLogger(__name__).info("Done — %d rows loaded to %s", total, args.target)
-    finally:
-        for loader in loaders:
-            loader.close()
+    if not csv_files:
+        log.warning("No CSV files found in %s", config.data_dir)
+        return
+
+    for csv_file in csv_files:
+        table = csv_file.stem
+        log.info("Processing %s → table '%s'", csv_file.name, table)
+        loaders = _build_loaders(args.target, config, table)
+        try:
+            total = run(
+                csv_path=str(csv_file),
+                chunk_size=config.chunk_size,
+                loaders=loaders,
+                transform=apply_transforms,
+            )
+            log.info("Done — %d rows loaded into '%s'", total, table)
+        finally:
+            for loader in loaders:
+                loader.close()
 
 
 if __name__ == "__main__":
