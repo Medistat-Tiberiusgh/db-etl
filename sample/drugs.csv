@@ -1,0 +1,80 @@
+atc,name,narcotic_class
+A03CA02,Klidinium och lugnande medel,IV
+A04AD10,Dronabinol,II
+A07DA01,Difenoxylat,II
+A07DA02,Opium,II
+A08AA51,Fentermin och topiramat,II
+M03BA02,Karisoprodol,IV
+M03BA52,"Karisoprodol, kombinationer exkl. psykoleptika",IV
+N01AF01,Metohexital,V
+N01AH01,Fentanyl,II
+N01AH02,Alfentanil,II
+N01AH03,Sufentanil,II
+N01AH06,Remifentanil,II
+N01AH51,"Fentanyl, kombinationer",II
+N01AX03,Ketamin,IV
+N01AX14,Esketamin,IV
+N02AA01,Morfin,II
+N02AA03,Hydromorfon,II
+N02AA05,Oxikodon,II
+N02AA55,Oxikodon och naloxon,II
+N02AA59,"Kodein, kombinationer exkl. neuroleptika",III
+N02AB01,Ketobemidon,II
+N02AB02,Petidin,II
+N02AB03,Fentanyl,II
+N02AC04,Dextropropoxifen,III
+N02AC54,"Dextropropoxifen, kombinationer exkl. neuroleptika",III
+N02AD01,Pentazocin,III
+N02AE01,Buprenorfin,IV
+N02AG01,Morfin och spasmolytika,II
+N02AG02,Ketobemidon och spasmolytika,II
+N02AG04,Hydromorfon och spasmolytika,II
+N02AJ06,Kodein och paracetamol,III
+N02AJ08,Kodein och ibuprofen,III
+N02AJ09,Kodein och övriga icke-opioida analgetika,III
+N02AJ13,Tramadol och paracetamol,III
+N02AX01,Tilidin,II
+N02AX02,Tramadol,III
+N02AX06,Tapentadol,II
+N02BF02,Pregabalin,V
+N02BG10,Kannabinoider,II
+N02CA72,"Ergotamin, kombinationer med neuroleptika",IV
+N03AA02,Fenobarbital,IV
+N03AE01,Klonazepam,IV
+N03AX24,Cannabidiol,II
+N05BA01,Diazepam,IV
+N05BA02,Klordiazepoxid,IV
+N05BA04,Oxazepam,IV
+N05BA05,Dikaliumklorazepat,IV
+N05BA06,Lorazepam,IV
+N05BA08,Bromazepam,IV
+N05BA09,Klobazam,IV
+N05BA12,Alprazolam,IV
+N05BC01,Meprobamat,IV
+N05CC01,Kloralhydrat,V
+N05CD02,Nitrazepam,IV
+N05CD03,Flunitrazepam,II
+N05CD05,Triazolam,IV
+N05CD08,Midazolam,IV
+N05CF01,Zopiklon,V
+N05CF02,Zolpidem,IV
+N05CM02,Klometiazol,V
+N06AX27,Esketamin,IV
+N06BA01,Amfetamin,II
+N06BA02,Dexamfetamin,II
+N06BA04,Metylfenidat,II
+N06BA07,Modafinil,IV
+N06BA11,Dexmetylfenidat,II
+N06BA12,Lisdexamfetamin,II
+N06BA13,Armodafinil,IV
+N07BC01,Buprenorfin,IV
+N07BC02,Metadon,II
+N07BC05,Levometadon,II
+N07BC51,"Buprenorfin, kombinationer",IV
+N07XX04,Natriumoxibat,II
+N07XX59,"Dextrometorfan, kombinationer",V
+R05DA04,Kodein,III
+R05DA09,Dextrometorfan,V
+R05DA20,Kombinationer,II
+R05FA02,Opiumderivat och expektorantia,III
+R05FB02,"Hosthämmande medel i kombination med expektorantia, exkl mukolytika",III
