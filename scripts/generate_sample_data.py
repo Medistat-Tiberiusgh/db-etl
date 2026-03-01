@@ -1,63 +1,82 @@
 """
-Generate a representative sample of prescription_data.csv for CI/testing.
+Generate synthetic prescription_data rows for CI/testing.
 
-Strategy:
-  - Filter to ATCs present in sample/drugs.csv (narcotics only) so that all
-    rows are consistent with the lookup tables already in sample/.
-  - Take a stratified random sample: ROWS_PER_GROUP rows per (year, region)
-    combination, covering the full breadth of the dataset.
+Reads valid FK values from sample/ lookup tables and produces fully
+synthetic rows — no dependency on the real prescription_data.csv.
+
+Usage as a script (smoke-test / manual inspection):
+    python scripts/generate_sample_data.py
+    python scripts/generate_sample_data.py --rows 1000 --seed 7
+
+Usage as a module (from pytest fixtures):
+    from scripts.generate_sample_data import generate_rows
+    rows = generate_rows(rows=200)
 """
 
+import argparse
 import csv
 import random
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
-DATA_FILE = ROOT / "data" / "prescription_data.csv"
-SAMPLE_DIR = ROOT / "sample"
-DRUGS_FILE = SAMPLE_DIR / "drugs.csv"
-OUTPUT_FILE = SAMPLE_DIR / "prescription_data.csv"
+SAMPLE_DIR = Path(__file__).parent.parent / "sample"
 
-ROWS_PER_GROUP = 20
-SEED = 42
+YEARS = list(range(2006, 2024))
+DEFAULT_ROWS = 500
+DEFAULT_SEED = 42
+ZERO_ROW_PROBABILITY = 0.25  # ~25 % of rows have zero prescriptions, matching real-data distribution
 
 
-def load_narcotic_atcs(path: Path) -> set[str]:
+def _load_column(path: Path, column: str) -> list[str]:
     with open(path, newline="", encoding="utf-8") as f:
-        return {row["atc"] for row in csv.DictReader(f)}
+        return [row[column] for row in csv.DictReader(f)]
 
 
-def main() -> None:
-    random.seed(SEED)
+def _load_drugs(path: Path) -> list[dict]:
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
-    narcotic_atcs = load_narcotic_atcs(DRUGS_FILE)
-    print(f"Loaded {len(narcotic_atcs)} narcotic ATCs from {DRUGS_FILE.name}")
 
-    groups: dict[tuple[str, str], list[dict]] = {}
-    with open(DATA_FILE, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames
-        for row in reader:
-            if row["atc"] not in narcotic_atcs:
-                continue
-            key = (row["year"], row["region"])
-            groups.setdefault(key, []).append(row)
+def generate_rows(rows: int = DEFAULT_ROWS, seed: int = DEFAULT_SEED) -> list[dict]:
+    """Return a list of synthetic prescription dicts with valid FK values."""
+    random.seed(seed)
 
-    print(f"Found {len(groups)} (year, region) groups after filtering")
+    drugs = _load_drugs(SAMPLE_DIR / "drugs.csv")
+    regions = _load_column(SAMPLE_DIR / "regions.csv", "id")
+    genders = _load_column(SAMPLE_DIR / "genders.csv", "id")
+    age_groups = _load_column(SAMPLE_DIR / "age_groups.csv", "id")
 
-    sample: list[dict] = []
-    for rows in groups.values():
-        sample.extend(random.sample(rows, min(ROWS_PER_GROUP, len(rows))))
+    result = []
+    for _ in range(rows):
+        drug = random.choice(drugs)
+        is_zero = random.random() < ZERO_ROW_PROBABILITY
+        num_prescriptions = 0 if is_zero else random.randint(1, 500)
+        num_patients = 0 if is_zero else random.randint(1, num_prescriptions)
+        per_1000 = 0.0 if is_zero else round(random.uniform(0.1, 50.0), 1)
 
-    sample.sort(key=lambda r: (r["year"], r["region"], r["atc"]))
+        result.append({
+            "year": random.choice(YEARS),
+            "region": random.choice(regions),
+            "atc": drug["atc"],
+            "gender": random.choice(genders),
+            "age_group": random.choice(age_groups),
+            "num_prescriptions": num_prescriptions,
+            "num_patients": num_patients,
+            "per_1000": per_1000,
+            "narcotic_class": drug["narcotic_class"],
+        })
 
-    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(sample)
-
-    print(f"Written {len(sample)} rows → {OUTPUT_FILE}")
+    return result
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate synthetic prescription data for testing")
+    parser.add_argument("--rows", type=int, default=DEFAULT_ROWS)
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    args = parser.parse_args()
+
+    data = generate_rows(rows=args.rows, seed=args.seed)
+
+    fieldnames = list(data[0].keys())
+    print(",".join(fieldnames))
+    for row in data:
+        print(",".join(str(row[f]) for f in fieldnames))
