@@ -1,6 +1,6 @@
 # From CSV to Database — ETL Pipeline
 
-A teaching example that loads a large CSV file into **PostgreSQL** and/or **MongoDB**, structured around clean code and SOLID principles.
+A teaching example that loads the Swedish narcotic prescription dataset (five related CSV files) into **PostgreSQL** and/or **MongoDB**, structured around clean code and SOLID principles. The pipeline scans a directory for CSV files and loads each one into its own table or collection, using the filename as the name.
 
 ## Project structure
 
@@ -8,11 +8,8 @@ A teaching example that loads a large CSV file into **PostgreSQL** and/or **Mong
 .
 ├── main.py                   # CLI entry point
 ├── Dockerfile                # Container image for the ETL app
-├── docker-compose.yml        # Local dev — databases only
-├── docker-compose.prod.yml   # Production — databases + seed service
-├── seed/
-│   └── customers.csv         # Small sample (committed to repo)
-├── data/                     # ⬅ Place the large CSV here (gitignored)
+├── docker-compose.yml        # Databases + seed service (profiles)
+├── data/                     # ⬅ Place the five CSV files here (gitignored)
 ├── src/
 │   ├── config.py             # Environment-based configuration
 │   ├── extractor.py          # Chunked CSV reading (Extract)
@@ -23,7 +20,9 @@ A teaching example that loads a large CSV file into **PostgreSQL** and/or **Mong
 │       ├── sql_loader.py     # SQLAlchemy implementation
 │       └── mongo_loader.py   # PyMongo implementation
 ├── scripts/
-│   └── generate_csv.py       # Optional: generate synthetic test data
+│   ├── narcotics_extractor.py  # Maps ATC codes to narcotic classes from NPL XML
+│   ├── preprocessing.py        # Filters raw Socialstyrelsen data → five CSV files
+│   └── generate_sample_data.py # Generates synthetic data for local development
 ├── pyproject.toml
 └── .env.example
 ```
@@ -43,23 +42,22 @@ A teaching example that loads a large CSV file into **PostgreSQL** and/or **Mong
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 
-## Data file
+## Data files
 
-A small sample dataset is included in `seed/customers.csv` so the project works out of the box.
-
-**For the full exercise**, download the large dataset from Moodle and place it in the `data/` directory:
+Place all five CSV files in the `data/` directory before running the pipeline:
 
 ```
-data/customers.csv    # ~50 MB, 500K+ rows
+data/
+├── prescription_data.csv   # Main fact table (~1.88 M rows)
+├── drugs.csv               # Narcotic drug lookup (79 rows)
+├── regions.csv             # Swedish region lookup (22 rows)
+├── genders.csv             # Gender lookup (2 rows)
+└── age_groups.csv          # Age group lookup (19 rows)
 ```
 
-Then update `CSV_PATH` in your `.env` file:
+These files are produced by the preprocessing scripts in `scripts/` (see **Dataset** below) and are gitignored — do not commit them to the repository.
 
-```
-CSV_PATH=data/customers.csv
-```
-
-The `data/` directory is gitignored — large files should never be committed to the repository.
+The pipeline loads every `.csv` file it finds in `DATA_DIR` and uses the filename (without extension) as the table or collection name. Update `DATA_DIR` in `.env` if your files are in a different location (default: `data`).
 
 ## Local development
 
@@ -85,21 +83,14 @@ docker compose down            # keeps data in volumes
 docker compose down -v         # removes data too
 ```
 
-By default the pipeline loads `seed/customers.csv`. To use the large dataset from Moodle:
-
-```bash
-# Either edit .env (CSV_PATH=data/customers.csv) or pass it inline:
-CSV_PATH=data/customers.csv uv run python main.py
-```
-
 ## Production / VPS deployment
 
 Everything runs inside Docker — no Python or uv needed on the host.
-The large CSV file is **not** baked into the Docker image. Instead, the `data/` directory on the host is mounted into the container as a read-only volume — the container reads the file directly from disk without copying it.
+The CSV files are **not** baked into the Docker image. Instead, the `data/` directory on the host is mounted into the container as a read-only volume.
 
-### 1. Upload the data file
+### 1. Upload the data files
 
-The large CSV needs to end up in the `data/` directory on the server. There are several ways to get it there.
+The CSV files need to end up in the `data/` directory on the server.
 
 **Option A — Copy from your local machine via SSH:**
 
@@ -107,36 +98,30 @@ The large CSV needs to end up in the `data/` directory on the server. There are 
 # Make sure the data/ directory exists on the server
 ssh user@your-server "mkdir -p ~/from-csv-to-database/data"
 
-# Copy the file (replace user and your-server with your actual credentials)
-scp /path/to/customers.csv user@your-server:~/from-csv-to-database/data/customers.csv
+# Copy all five files
+scp /path/to/data/*.csv user@your-server:~/from-csv-to-database/data/
 ```
 
 If you're using an SSH key (`.pem` file) instead of a password:
 
 ```bash
-scp -i ~/.ssh/your-key.pem /path/to/customers.csv user@your-server:~/from-csv-to-database/data/
+scp -i ~/.ssh/your-key.pem /path/to/data/*.csv user@your-server:~/from-csv-to-database/data/
 ```
 
 **Option B — Download directly on the server from a remote URL:**
-
-If the file is hosted somewhere (e.g. AWS S3, a shared link, or your university's file server), you can download it straight to the VPS without going through your local machine:
 
 ```bash
 ssh user@your-server
 cd ~/from-csv-to-database
 mkdir -p data
-
-# From a public URL
-curl -o data/customers.csv https://example.com/customers.csv
-
-# From AWS S3 (requires aws cli configured on the server)
-aws s3 cp s3://your-bucket/customers.csv data/customers.csv
+curl -o data/prescription_data.csv https://example.com/prescription_data.csv
+# repeat for the other four files
 ```
 
 ### 2. Start the databases
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+docker compose up -d
 ```
 
 This starts **PostgreSQL** and **MongoDB** with health checks. They stay running in the background.
@@ -144,21 +129,21 @@ This starts **PostgreSQL** and **MongoDB** with health checks. They stay running
 ### 3. Seed the databases (run once)
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm seed
+docker compose run --rm seed
 ```
 
-The seed service mounts `./data` from the host, waits for both databases to be healthy, loads the CSV, then exits. Nothing is copied into the image.
+The seed service mounts `./data` from the host, waits for both databases to be healthy, loads all CSV files, then exits. Nothing is copied into the image.
 
 ### 4. Verify
 
 ```bash
 # Check PostgreSQL
-docker compose -f docker-compose.prod.yml exec postgres \
-  psql -U etl_user -d etl_demo -c "SELECT count(*) FROM customers;"
+docker compose exec postgres \
+  psql -U ${DB_USER} -d ${DB_NAME} -c "SELECT count(*) FROM prescription_data;"
 
 # Check MongoDB
-docker compose -f docker-compose.prod.yml exec mongo \
-  mongosh --quiet --eval "db.getSiblingDB('etl_demo').customers.countDocuments()"
+docker compose exec mongo \
+  mongosh --quiet --eval "db.getSiblingDB('${MONGO_DB}').prescription_data.countDocuments()"
 ```
 
 ### Seeding via CI/CD
@@ -170,8 +155,8 @@ Add a step to your pipeline that runs after deployment:
 seed-database:
   stage: deploy
   script:
-    - docker compose -f docker-compose.prod.yml up -d
-    - docker compose -f docker-compose.prod.yml run --rm seed
+    - docker compose up -d
+    - docker compose run --rm seed
   only:
     - main
   when: manual   # run once, not on every push
@@ -181,21 +166,63 @@ seed-database:
 
 ```bash
 # Re-seed (rebuild to pick up code changes)
-docker compose -f docker-compose.prod.yml run --rm --build seed
+docker compose run --rm --build seed
 
 # View seed logs
-docker compose -f docker-compose.prod.yml logs seed
+docker compose logs seed
 
 # Tear everything down
-docker compose -f docker-compose.prod.yml down      # keeps data
-docker compose -f docker-compose.prod.yml down -v    # removes data too
+docker compose down      # keeps data
+docker compose down -v   # removes data too
 ```
 
 ## Key design decisions
 
-- **Chunked reading** — the CSV is streamed in configurable chunks so files larger than available RAM can be processed.
+- **Chunked reading** — each CSV is streamed in configurable chunks so files larger than available RAM can be processed.
 - **Context-manager support** — loaders implement `__enter__`/`__exit__` for automatic resource cleanup.
 - **Composable transforms** — each transform is a pure function `DataFrame → DataFrame`, easy to test and reorder.
 - **Environment-based config** — secrets stay out of source code; different environments just set different env vars.
-- **Two compose files** — `docker-compose.yml` for local dev (databases only, fast iteration), `docker-compose.prod.yml` for deployment (everything containerized).
-- **Seed data in the repo** — `seed/customers.csv` is a small committed sample so the project works immediately. The large dataset is distributed separately and kept out of version control.
+- **Directory-based loading** — the pipeline scans `DATA_DIR` for all `.csv` files and loads each into its own table/collection, so adding a new file requires no code changes.
+- **Single compose file** — `docker-compose.yml` covers both local dev (run databases only) and deployment (add the `seed` service via `docker compose run`).
+
+## Dataset
+
+### Source
+
+The data originates from two Swedish public health authorities:
+
+- **Socialstyrelsen** (National Board of Health and Welfare) — prescription statistics 2006–2024, available via the open statistics API at [socialstyrelsen.se/statistik-och-data/statistik/for-utvecklare](https://www.socialstyrelsen.se/statistik-och-data/statistik/for-utvecklare/) (CSV Statistikdatabasen – Läkemedel 2006–2024).
+- **Läkemedelsverket** (Medical Products Agency) — narcotic classification per ATC code, extracted from the Nationellt produktregister för läkemedel (NPL).
+
+### Preprocessing and filtering
+
+The raw Socialstyrelsen export covers all dispensed prescriptions. The scripts in `scripts/` reduce this to narcotic drugs only:
+
+1. `narcotics_extractor.py` — parses NPL XML product files and builds a mapping of ATC codes to narcotic class (II–V).
+2. `preprocessing.py` — filters the raw prescription data to only rows whose ATC code appears in that mapping, then joins in drug names and generates the four lookup tables.
+
+**`prescription_data.csv` therefore contains only narcotic-classified prescriptions** — not all dispensed drugs. This is intentional: the dataset is scoped to controlled substances for focused analysis.
+
+### Entities
+
+| File | Rows | Description |
+|---|---|---|
+| `prescription_data.csv` | ~1.88 M | Main fact table — one row per (year, region, drug, gender, age group) combination |
+| `drugs.csv` | 79 | Lookup — narcotic-classified drugs with ATC code and Swedish name |
+| `regions.csv` | 22 | Lookup — Swedish regions (counties + national total "Riket") |
+| `genders.csv` | 2 | Lookup — gender categories (Män / Kvinnor) |
+| `age_groups.csv` | 19 | Lookup — five-year age bands (0–4, 5–9, … 90+) |
+
+### Key fields — `prescription_data.csv`
+
+| Field | Type | Description |
+|---|---|---|
+| `year` | int | Calendar year (2006–2024) |
+| `region` | int | Region ID (FK → `regions.id`) |
+| `atc` | string | 7-character ATC code (FK → `drugs.atc`) |
+| `gender` | int | Gender ID (FK → `genders.id`) |
+| `age_group` | int | Age group ID (FK → `age_groups.id`) |
+| `num_prescriptions` | int | Number of dispensed prescriptions |
+| `num_patients` | int | Number of unique patients |
+| `per_1000` | float | Dispensations per 1,000 inhabitants |
+| `narcotic_class` | string | Narcotic schedule (II, III, IV, or V) |
