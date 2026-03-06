@@ -62,7 +62,7 @@ per_1000      = load_file(PER_1000, 'per_1000')
 # --- Joina och spara prescriptions ---
 print("Joinар...")
 df = expedieringar.merge(patienter, on=KEYS).merge(per_1000, on=KEYS)
-df = df.merge(narcotic_map, left_on='ATC-kod', right_on='atc').drop(columns='atc')
+df = df.merge(narcotic_map, left_on='ATC-kod', right_on='atc').drop(columns=['atc', 'narcotic_class'])
 df = df.rename(columns={
     'År':       'year',
     'Region':   'region',
