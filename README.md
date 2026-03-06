@@ -9,6 +9,8 @@ A teaching example that loads the Swedish narcotic prescription dataset (five re
 ├── main.py                   # CLI entry point
 ├── Dockerfile                # Container image for the ETL app
 ├── docker-compose.yml        # Databases + seed service (profiles)
+├── init/
+│   └── schema.sql            # PostgreSQL schema — runs automatically on first db start
 ├── data/                     # ⬅ Place the five CSV files here (gitignored)
 ├── src/
 │   ├── config.py             # Environment-based configuration
@@ -225,4 +227,3 @@ The raw Socialstyrelsen export covers all dispensed prescriptions. The scripts i
 | `num_prescriptions` | int | Number of dispensed prescriptions |
 | `num_patients` | int | Number of unique patients |
 | `per_1000` | float | Dispensations per 1,000 inhabitants |
-| `narcotic_class` | string | Narcotic schedule (II, III, IV, or V) |
