@@ -205,13 +205,13 @@ The raw Socialstyrelsen export covers all dispensed prescriptions. The scripts i
 
 ### Entities
 
-| File | Rows | Description |
-|---|---|---|
-| `prescription_data.csv` | ~1.88 M | Main fact table — one row per (year, region, drug, gender, age group) combination |
-| `drugs.csv` | 79 | Lookup — narcotic-classified drugs with ATC code and Swedish name |
-| `regions.csv` | 22 | Lookup — Swedish regions (counties + national total "Riket") |
-| `genders.csv` | 2 | Lookup — gender categories (Män / Kvinnor) |
-| `age_groups.csv` | 19 | Lookup — five-year age bands (0–4, 5–9, … 90+) |
+| File | Rows | API role | Description |
+|---|---|---|---|
+| `prescription_data.csv` | ~1.88 M | **Primary resource (CRUD)** | Main fact table — one row per (year, region, drug, gender, age group) combination |
+| `drugs.csv` | 79 | Read-only resource | Narcotic-classified drugs with ATC code and Swedish name |
+| `regions.csv` | 22 | Read-only resource | Swedish regions (counties + national total "Riket") |
+| `genders.csv` | 2 | Read-only resource | Gender categories (Män / Kvinnor) |
+| `age_groups.csv` | 19 | Read-only resource | Five-year age bands (0–4, 5–9, … 90+) |
 
 ### Key fields — `prescription_data.csv`
 
