@@ -15,13 +15,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def fill_missing(df: pd.DataFrame, default: str = "Unknown") -> pd.DataFrame:
-    """Replace NaN / None values with *default*."""
-    return df.fillna(default)
-
-
 def apply_transforms(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full transformation pipeline on a single chunk."""
     df = normalize_columns(df)
-    df = fill_missing(df)
     return df

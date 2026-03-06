@@ -180,7 +180,7 @@ docker compose down -v   # removes data too
 
 - **Chunked reading** — each CSV is streamed in configurable chunks so files larger than available RAM can be processed.
 - **Context-manager support** — loaders implement `__enter__`/`__exit__` for automatic resource cleanup.
-- **Composable transforms** — each transform is a pure function `DataFrame → DataFrame`, easy to test and reorder.
+- **Composable transforms** — each transform is a pure function `DataFrame → DataFrame`, easy to test and extend. The dataset is pre-processed and clean, so only column normalisation is applied at load time.
 - **Environment-based config** — secrets stay out of source code; different environments just set different env vars.
 - **Directory-based loading** — the pipeline scans `DATA_DIR` for all `.csv` files and loads each into its own table/collection, so adding a new file requires no code changes.
 - **Single compose file** — `docker-compose.yml` covers both local dev (run databases only) and deployment (add the `seed` service via `docker compose run`).
