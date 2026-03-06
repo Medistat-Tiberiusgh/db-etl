@@ -15,7 +15,20 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    """Fix locale-formatted floats (e.g. '0,01' → 0.01) that pandas reads as strings."""
+    df = df.copy()
+    for col in df.select_dtypes(include="object").columns:
+        converted = df[col].str.replace(",", ".", regex=False)
+        try:
+            df[col] = pd.to_numeric(converted)
+        except (ValueError, TypeError):
+            pass
+    return df
+
+
 def apply_transforms(df: pd.DataFrame) -> pd.DataFrame:
     """Run the full transformation pipeline on a single chunk."""
     df = normalize_columns(df)
+    df = coerce_numeric(df)
     return df
