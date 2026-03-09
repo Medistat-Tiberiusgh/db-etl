@@ -56,7 +56,7 @@ def main() -> None:
 
     log = logging.getLogger(__name__)
     config = load_config()
-    csv_files = sorted(Path(config.data_dir).glob("*.csv"))
+    csv_files = sorted(Path(config.data_dir).glob("*.csv"), key=lambda p: (p.stem == "prescription_data", p.name))
 
     if not csv_files:
         log.warning("No CSV files found in %s", config.data_dir)

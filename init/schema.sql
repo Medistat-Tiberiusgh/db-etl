@@ -5,10 +5,8 @@
 -- It runs before the ETL seed service, so all tables exist with proper types
 -- and constraints when the data is inserted.
 --
--- Note: foreign key constraints between tables are intentionally omitted.
--- The ETL loads CSV files in filesystem order (non-deterministic), so lookup
--- tables (drugs, regions, etc.) may not be populated before prescription_data
--- is loaded. PKs and NOT NULL constraints cover the important invariants.
+-- Lookup tables are loaded before prescription_data (enforced by ETL load order),
+-- so foreign key constraints are safe to use here.
 
 -- -----------------------------------------------------------------------------
 -- Lookup tables
@@ -44,13 +42,18 @@ CREATE TABLE IF NOT EXISTS age_groups (
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS prescription_data (
-    year                INTEGER NOT NULL,
+    year                INTEGER NOT NULL CHECK (year >= 2006 AND year <= EXTRACT(YEAR FROM CURRENT_DATE)),
     region              INTEGER NOT NULL,
     atc                 TEXT    NOT NULL,
     gender              INTEGER NOT NULL,
     age_group           INTEGER NOT NULL,
-    num_prescriptions   INTEGER NOT NULL,
-    num_patients        INTEGER NOT NULL,
-    per_1000            FLOAT   NOT NULL,
-    PRIMARY KEY (year, region, atc, gender, age_group)
+    num_prescriptions   INTEGER NOT NULL CHECK (num_prescriptions >= 0),
+    num_patients        INTEGER NOT NULL CHECK (num_patients >= 0),
+    per_1000            NUMERIC(10, 2)   NOT NULL CHECK (per_1000 >= 0),
+    PRIMARY KEY (year, region, atc, gender, age_group),
+    CONSTRAINT chk_prescriptions_gte_patients CHECK (num_prescriptions >= num_patients),
+    FOREIGN KEY (region)    REFERENCES regions(id),
+    FOREIGN KEY (atc)       REFERENCES drugs(atc),
+    FOREIGN KEY (gender)    REFERENCES genders(id),
+    FOREIGN KEY (age_group) REFERENCES age_groups(id)
 );
