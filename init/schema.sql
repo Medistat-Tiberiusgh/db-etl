@@ -57,3 +57,13 @@ CREATE TABLE IF NOT EXISTS prescription_data (
     FOREIGN KEY (gender)    REFERENCES genders(id),
     FOREIGN KEY (age_group) REFERENCES age_groups(id)
 );
+
+-- -----------------------------------------------------------------------------
+-- User table
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id            SERIAL      PRIMARY KEY,
+  username      TEXT        NOT NULL UNIQUE,
+  password_hash TEXT        NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
