@@ -22,7 +22,6 @@ services:
     environment:
       DB_HOST: postgres
       DATA_DIR: /data
-    command: ["--target", "sql"]
     volumes:
       - ./data:/data:ro
     depends_on:
