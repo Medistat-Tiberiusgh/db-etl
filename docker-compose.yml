@@ -33,6 +33,7 @@ services:
     environment:
       DB_HOST: postgres
       MONGO_HOST: mongo
+      DATA_DIR: /data
     volumes:
       - ./data:/data:ro
     depends_on:

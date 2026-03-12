@@ -1,6 +1,8 @@
-# Data processing pipeline that filters Socialstyrelsen csv files, filters narcotic medicine,
-# and unifies total prescriptions, patient counts, and rates per 1,000 inhabitants into one
-# unified table based on year, region, and demographics.
+# Data processing pipeline that filters Socialstyrelsen csv files and unifies total
+# prescriptions, patient counts, and rates per 1,000 inhabitants into one unified table
+# based on year, region, and demographics.
+# All human drugs (7-character ATC codes, excluding veterinary Q-prefix) are included.
+# Narcotic class is added where available via a left join with the narcotic mapping.
 # Also generates lookup tables for drugs, regions, genders, and age groups.
 
 # Requires "atc_narkotika_mapping.csv" that results from running "narcotics_extractor.py"
@@ -21,7 +23,7 @@ REGIONS_META  = "läkemedel - meta - regioner.csv"
 GENDERS_META  = "läkemedel - meta - kön.csv"
 AGES_META     = "läkemedel - meta - åldrar.csv"
 
-RESULTS_DIR = "results"
+RESULTS_DIR = "results2"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 OUTPUT_PRESCRIPTIONS = f"{RESULTS_DIR}/prescription_data.csv"
@@ -35,8 +37,7 @@ KEYS = ['År', 'Region', 'ATC-kod', 'Kön', 'Ålder']
 # --- Narkotikamappning ---
 print("Laddar narkotikamappning...")
 narcotic_map = pd.read_csv(MAPPING)
-valid_atc = set(narcotic_map['atc'])
-print(f"  {len(valid_atc)} narkotika-ATC-koder laddade")
+print(f"  {len(narcotic_map)} narkotika-ATC-koder laddade")
 
 # --- Datafiler ---
 def load_file(filepath, value_name):
@@ -44,8 +45,8 @@ def load_file(filepath, value_name):
     chunks = []
     for i, chunk in enumerate(pd.read_csv(filepath, sep=';', encoding='utf-8-sig', chunksize=500_000)):
         filtered = chunk[
-            chunk['ATC-kod'].isin(valid_atc) &
-            (chunk['ATC-kod'].str.len() == 7)
+            (chunk['ATC-kod'].str.len() == 7) &
+            (~chunk['ATC-kod'].str.startswith('Q'))
         ]
         chunks.append(filtered)
         if i % 10 == 0:
@@ -59,10 +60,24 @@ expedieringar = load_file(EXPEDIERINGAR, 'num_prescriptions')
 patienter     = load_file(PATIENTER, 'num_patients')
 per_1000      = load_file(PER_1000, 'per_1000')
 
+# --- Lookup-tabeller ---
+print("Genererar lookup-tabeller...")
+
+atc_meta = pd.read_csv(ATC_META, sep=';', encoding='utf-8-sig')
+atc_meta.columns = ['atc', 'name']
+atc_meta = atc_meta[
+    (atc_meta['atc'].str.len() == 7) &
+    (~atc_meta['atc'].str.startswith('Q'))
+]
+drugs = atc_meta.merge(narcotic_map, on='atc', how='left')
+drugs = drugs.dropna(subset=['name'])
+drugs = drugs[drugs['name'].str.strip() != '']
+drugs.to_csv(OUTPUT_DRUGS, index=False)
+print(f"  {OUTPUT_DRUGS}: {len(drugs)} rader")
+
 # --- Joina och spara prescriptions ---
 print("Joinар...")
 df = expedieringar.merge(patienter, on=KEYS).merge(per_1000, on=KEYS)
-df = df.merge(narcotic_map, left_on='ATC-kod', right_on='atc').drop(columns=['atc', 'narcotic_class'])
 df = df.rename(columns={
     'År':       'year',
     'Region':   'region',
@@ -70,17 +85,10 @@ df = df.rename(columns={
     'Kön':      'gender',
     'Ålder':    'age_group',
 })
+valid_atc = set(drugs['atc'])
+df = df[df['atc'].isin(valid_atc)]
 print(f"Sparar {OUTPUT_PRESCRIPTIONS} med {len(df):,} rader...")
 df.to_csv(OUTPUT_PRESCRIPTIONS, index=False)
-
-# --- Lookup-tabeller ---
-print("Genererar lookup-tabeller...")
-
-atc_meta = pd.read_csv(ATC_META, sep=';', encoding='utf-8-sig')
-atc_meta.columns = ['atc', 'name']
-drugs = atc_meta.merge(narcotic_map, on='atc')
-drugs.to_csv(OUTPUT_DRUGS, index=False)
-print(f"  {OUTPUT_DRUGS}: {len(drugs)} rader")
 
 regions = pd.read_csv(REGIONS_META, sep=';', encoding='utf-8-sig')
 regions.columns = ['id', 'name']

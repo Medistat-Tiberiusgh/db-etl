@@ -1,4 +1,4 @@
--- Schema for the narcotic prescription dataset.
+-- Schema for the Swedish prescription statistics dataset.
 --
 -- This file is mounted into /docker-entrypoint-initdb.d/ and is executed
 -- automatically by PostgreSQL the first time the database volume is created.
@@ -15,7 +15,7 @@
 CREATE TABLE IF NOT EXISTS drugs (
     atc             TEXT    NOT NULL,
     name            TEXT    NOT NULL,
-    narcotic_class  TEXT    NOT NULL,
+    narcotic_class  TEXT,
     PRIMARY KEY (atc)
 );
 
@@ -59,11 +59,46 @@ CREATE TABLE IF NOT EXISTS prescription_data (
 );
 
 -- -----------------------------------------------------------------------------
+-- Indexes for prescription_data
+-- -----------------------------------------------------------------------------
+
+-- Primary lookup: all statistics for a given drug
+CREATE INDEX IF NOT EXISTS idx_prescription_data_atc
+    ON prescription_data (atc);
+
+-- Regional benchmarking: drug × region × year (the "killer feature" queries)
+CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_region_year
+    ON prescription_data (atc, region, year);
+
+-- Demographic context: drug × gender × age_group
+CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_demographics
+    ON prescription_data (atc, gender, age_group);
+
+-- Trend analysis: drug × year
+CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_year
+    ON prescription_data (atc, year);
+
+-- -----------------------------------------------------------------------------
 -- User table
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL      PRIMARY KEY,
   username      TEXT        NOT NULL UNIQUE,
   password_hash TEXT        NOT NULL,
+  region_id     INTEGER     REFERENCES regions(id),
+  gender_id     INTEGER     REFERENCES genders(id),
+  age_group_id  INTEGER     REFERENCES age_groups(id),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- -----------------------------------------------------------------------------
+-- UserMedication table
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_medications (
+  id          SERIAL      PRIMARY KEY,
+  user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  atc         TEXT        NOT NULL REFERENCES drugs(atc),
+  notes       TEXT,
+  added_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, atc)
 );
