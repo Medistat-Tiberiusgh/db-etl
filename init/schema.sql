@@ -85,9 +85,9 @@ CREATE TABLE IF NOT EXISTS users (
   id            SERIAL      PRIMARY KEY,
   username      TEXT        NOT NULL UNIQUE,
   password_hash TEXT        NOT NULL,
-  region_id     INTEGER     REFERENCES regions(id),
-  gender_id     INTEGER     REFERENCES genders(id),
-  age_group_id  INTEGER     REFERENCES age_groups(id),
+  region_id     INTEGER     NOT NULL REFERENCES regions(id),
+  gender_id     INTEGER     NOT NULL REFERENCES genders(id),
+  age_group_id  INTEGER     NOT NULL REFERENCES age_groups(id),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
