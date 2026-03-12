@@ -6,8 +6,6 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d:ro
@@ -15,34 +13,28 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 3s
       retries: 10
-
-  mongo:
-    image: mongo:7
-    ports:
-      - "${MONGO_PORT}:27017"
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
-      interval: 3s
-      retries: 10
+    networks:
+      - edge
 
   seed:
     build: .
     env_file: .env
     environment:
       DB_HOST: postgres
-      MONGO_HOST: mongo
+      DATA_DIR: /data
     volumes:
       - ./data:/data:ro
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
     profiles:
       - seed
+    networks:
+      - edge
 
 volumes:
   pg_data:
-  mongo_data:
+
+networks:
+  edge:
+    external: true
