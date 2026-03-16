@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS users (
   username      TEXT        NOT NULL UNIQUE,
   password_hash TEXT        NOT NULL,
   region_id     INTEGER     NOT NULL REFERENCES regions(id) CHECK (region_id <> 0),
-  gender_id     INTEGER     NOT NULL REFERENCES genders(id),
+  gender_id     INTEGER     NOT NULL REFERENCES genders(id) CHECK (gender_id <> 3),
   age_group_id  INTEGER     NOT NULL REFERENCES age_groups(id) CHECK (age_group_id <> 99),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
