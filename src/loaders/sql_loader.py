@@ -25,7 +25,7 @@ class SqlLoader(Loader):
             self._engine,
             if_exists="append",
             index=False,
-            chunksize=1_000,
+            chunksize=5_000,
         )
         self._total += rows
         logger.info("Inserted %d rows into SQL table '%s' (total %d)", rows, self._table, self._total)
