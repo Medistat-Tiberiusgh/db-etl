@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_year
 -- User table
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id            SERIAL      PRIMARY KEY,
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   username      TEXT        NOT NULL UNIQUE,
   password_hash TEXT        NOT NULL,
   region_id     INTEGER     NOT NULL REFERENCES regions(id) CHECK (region_id <> 0),
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_medications (
   id          SERIAL      PRIMARY KEY,
-  user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   atc         TEXT        NOT NULL REFERENCES drugs(atc),
   notes       TEXT,
   added_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
