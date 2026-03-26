@@ -19,7 +19,7 @@ class SqlConfig:
 @dataclass(frozen=True)
 class EtlConfig:
     data_dir: str
-    chunk_size: int = 5_000
+    chunk_size: int = 100_000
     sql: SqlConfig = field(default_factory=lambda: SqlConfig(uri=""))
 
 
@@ -33,6 +33,6 @@ def load_config() -> EtlConfig:
     )
     return EtlConfig(
         data_dir=os.environ.get("DATA_DIR", "/data"),
-        chunk_size=int(os.environ.get("CHUNK_SIZE", "5000")),
+        chunk_size=int(os.environ.get("CHUNK_SIZE", "100000")),
         sql=SqlConfig(uri=sql_uri),
     )

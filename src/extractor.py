@@ -17,4 +17,4 @@ def read_csv_chunks(path: str | Path, chunk_size: int) -> Iterator[pd.DataFrame]
     if not path.exists():
         raise FileNotFoundError(f"CSV file not found: {path}")
 
-    yield from pd.read_csv(path, chunksize=chunk_size)
+    yield from pd.read_csv(path, chunksize=chunk_size, low_memory=False)
