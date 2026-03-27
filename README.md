@@ -63,7 +63,7 @@ The scripts in `scripts/` prepare the raw data for loading:
 | File                    | Rows  | API role                    | Description                                                                       |
 | ----------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------- |
 | `prescription_data.csv` | ~46 M | **Primary resource (CRUD)** | Main fact table — one row per (year, region, drug, gender, age group) combination |
-| `drugs.csv`             | —     | Read-only resource          | All human drugs with ATC code, Swedish name, and narcotic class (if applicable)   |
+| `drugs.csv`             | 1999  | Read-only resource          | All human drugs with ATC code, Swedish name, and narcotic class (if applicable)   |
 | `regions.csv`           | 22    | Read-only resource          | Swedish regions (counties + national total "Riket")                               |
 | `genders.csv`           | 3     | Read-only resource          | Gender categories (Män / Kvinnor / Båda könen)                                    |
 | `age_groups.csv`        | 19    | Read-only resource          | Five-year age bands (0–4, 5–9, … 90+) plus total                                  |
