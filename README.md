@@ -2,78 +2,17 @@
 
 A teaching example that loads the Swedish prescription statistics dataset (five related CSV files) into **PostgreSQL**, structured around clean code and SOLID principles. The pipeline scans a directory for CSV files and loads each one into its own table, using the filename as the name.
 
-## Project structure
-
-```
-.
-├── main.py                   # CLI entry point
-├── Dockerfile                # Container image for the ETL app
-├── docker-compose.yml        # Databases + seed service (profiles)
-├── init/
-│   └── schema.sql            # PostgreSQL schema — runs automatically on first db start
-├── data/                     # ⬅ Place the five CSV files here (gitignored)
-├── src/
-│   ├── config.py             # Environment-based configuration
-│   ├── extractor.py          # Chunked CSV reading (Extract)
-│   ├── transformer.py        # Data cleaning functions (Transform)
-│   ├── pipeline.py           # ETL orchestrator
-│   └── loaders/
-│       ├── base.py           # Abstract Loader interface
-│       ├── sql_loader.py     # SQLAlchemy implementation
-│       └── mongo_loader.py   # PyMongo implementation
-├── scripts/
-│   ├── narcotics_extractor.py  # Maps ATC codes to narcotic classes from NPL XML
-│   ├── preprocessing.py        # Filters raw Socialstyrelsen data → five CSV files
-│   └── generate_sample_data.py # Generates synthetic data for local development
-├── pyproject.toml
-└── .env.example
-```
-
-## SOLID principles in practice
-
-| Principle | Where it shows up |
-|---|---|
-| **Single Responsibility** | Each module handles exactly one concern (extract, transform, or load). |
-| **Open / Closed** | Adding a new database target means creating a new `Loader` subclass — no existing code changes. |
-| **Liskov Substitution** | Any `Loader` subclass is interchangeable wherever `Loader` is expected. |
-| **Interface Segregation** | The `Loader` base class exposes only `load()` and `close()` — nothing more. |
-| **Dependency Inversion** | `pipeline.run()` accepts `list[Loader]`, never importing a concrete database client. |
-
-## Prerequisites
-
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-
-## Data files
-
-Place all five CSV files in the `data/` directory before running the pipeline:
-
-```
-data/
-├── prescription_data.csv   # Main fact table (~46 M rows)
-├── drugs.csv               # Drug lookup (ATC code, name, narcotic class)
-├── regions.csv             # Swedish region lookup (22 rows)
-├── genders.csv             # Gender lookup (3 rows)
-└── age_groups.csv          # Age group lookup (19 rows)
-```
-
-These files are produced by the preprocessing scripts in `scripts/` (see **Dataset** below) and are gitignored — do not commit them to the repository.
-
-The pipeline loads every `.csv` file it finds in `DATA_DIR` and uses the filename (without extension) as the table name. Update `DATA_DIR` in `.env` if your files are in a different location (default: `data`).
-
 ## Local development
 
-### Sample data
+### Data
 
-A small synthetic dataset is provided in the `sample/` folder for local development and testing. It contains the same five CSV files as the full dataset but with a fraction of the rows, so seeding completes in seconds.
+A sample dataset is provided in the `sample/` folder. It contains the same five CSV files as the full dataset but with a fraction of the rows, so seeding completes in seconds. This is sufficient to run the API and the test suite.
 
-To use it, rename (or copy) the folder to `data/`:
+Rename it to `data/` before seeding:
 
 ```bash
 mv sample data
 ```
-
-Then seed the database as described below. This is sufficient to run the API and the test suite.
 
 ```bash
 # 1. Configure (copy and edit)
@@ -87,99 +26,12 @@ docker compose up -d
 
 # 4. Seed the database
 docker compose run --rm seed
-
-# Stop when done
-docker compose down            # keeps data in volumes
-docker compose down -v         # removes data too
 ```
 
 ## Production / VPS deployment
 
 Everything runs inside Docker — no Python or uv needed on the host.
 The CSV files are **not** baked into the Docker image. Instead, the `data/` directory on the host is mounted into the container as a read-only volume.
-
-### 1. Upload the data files
-
-The CSV files need to end up in the `data/` directory on the server.
-
-**Option A — Copy from your local machine via SSH:**
-
-```bash
-# Make sure the data/ directory exists on the server
-ssh user@your-server "mkdir -p ~/from-csv-to-database/data"
-
-# Copy all five files
-scp /path/to/data/*.csv user@your-server:~/from-csv-to-database/data/
-```
-
-If you're using an SSH key (`.pem` file) instead of a password:
-
-```bash
-scp -i ~/.ssh/your-key.pem /path/to/data/*.csv user@your-server:~/from-csv-to-database/data/
-```
-
-**Option B — Download directly on the server from a remote URL:**
-
-```bash
-ssh user@your-server
-cd ~/from-csv-to-database
-mkdir -p data
-curl -o data/prescription_data.csv https://example.com/prescription_data.csv
-# repeat for the other four files
-```
-
-### 2. Start the databases
-
-```bash
-docker compose up -d
-```
-
-This starts **PostgreSQL** with a health check. It stays running in the background.
-
-### 3. Seed the databases (run once)
-
-```bash
-docker compose run --rm seed
-```
-
-The seed service mounts `./data` from the host, waits for the database to be healthy, loads all CSV files, then exits. Nothing is copied into the image.
-
-### 4. Verify
-
-```bash
-docker compose exec postgres \
-  psql -U ${DB_USER} -d ${DB_NAME} -c "SELECT count(*) FROM prescription_data;"
-```
-
-### Seeding via CI/CD
-
-Add a step to your pipeline that runs after deployment:
-
-```yaml
-# GitLab CI example
-seed-database:
-  stage: deploy
-  script:
-    - docker compose up -d
-    - docker compose run --rm seed
-  only:
-    - main
-  when: manual   # run once, not on every push
-```
-
-### Re-seeding or tearing down
-
-```bash
-# Re-seed (rebuild to pick up code changes)
-docker compose run --rm --build seed
-
-# View seed logs
-docker compose logs seed
-
-# Tear everything down
-docker compose down      # keeps data
-docker compose down -v   # removes data too
-```
 
 ## Key design decisions
 
@@ -208,23 +60,23 @@ The scripts in `scripts/` prepare the raw data for loading:
 
 ### Entities
 
-| File | Rows | API role | Description |
-|---|---|---|---|
+| File                    | Rows  | API role                    | Description                                                                       |
+| ----------------------- | ----- | --------------------------- | --------------------------------------------------------------------------------- |
 | `prescription_data.csv` | ~46 M | **Primary resource (CRUD)** | Main fact table — one row per (year, region, drug, gender, age group) combination |
-| `drugs.csv` | — | Read-only resource | All human drugs with ATC code, Swedish name, and narcotic class (if applicable) |
-| `regions.csv` | 22 | Read-only resource | Swedish regions (counties + national total "Riket") |
-| `genders.csv` | 3 | Read-only resource | Gender categories (Män / Kvinnor / Båda könen) |
-| `age_groups.csv` | 19 | Read-only resource | Five-year age bands (0–4, 5–9, … 90+) plus total |
+| `drugs.csv`             | —     | Read-only resource          | All human drugs with ATC code, Swedish name, and narcotic class (if applicable)   |
+| `regions.csv`           | 22    | Read-only resource          | Swedish regions (counties + national total "Riket")                               |
+| `genders.csv`           | 3     | Read-only resource          | Gender categories (Män / Kvinnor / Båda könen)                                    |
+| `age_groups.csv`        | 19    | Read-only resource          | Five-year age bands (0–4, 5–9, … 90+) plus total                                  |
 
 ### Key fields — `prescription_data.csv`
 
-| Field | Type | Description |
-|---|---|---|
-| `year` | int | Calendar year (2006–2024) |
-| `region` | int | Region ID (FK → `regions.id`) |
-| `atc` | string | 7-character ATC code (FK → `drugs.atc`) |
-| `gender` | int | Gender ID (FK → `genders.id`) |
-| `age_group` | int | Age group ID (FK → `age_groups.id`) |
-| `num_prescriptions` | int | Number of dispensed prescriptions |
-| `num_patients` | int | Number of unique patients |
-| `per_1000` | float | Dispensations per 1,000 inhabitants |
+| Field               | Type   | Description                             |
+| ------------------- | ------ | --------------------------------------- |
+| `year`              | int    | Calendar year (2006–2024)               |
+| `region`            | int    | Region ID (FK → `regions.id`)           |
+| `atc`               | string | 7-character ATC code (FK → `drugs.atc`) |
+| `gender`            | int    | Gender ID (FK → `genders.id`)           |
+| `age_group`         | int    | Age group ID (FK → `age_groups.id`)     |
+| `num_prescriptions` | int    | Number of dispensed prescriptions       |
+| `num_patients`      | int    | Number of unique patients               |
+| `per_1000`          | float  | Dispensations per 1,000 inhabitants     |
