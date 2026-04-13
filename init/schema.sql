@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS age_groups (
     PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS drug_info (
+    atc         TEXT        PRIMARY KEY REFERENCES drugs(atc),
+    data        JSONB       NOT NULL DEFAULT '{}',
+    scraped_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- -----------------------------------------------------------------------------
 -- Fact table
 -- -----------------------------------------------------------------------------
