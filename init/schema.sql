@@ -90,10 +90,11 @@ CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_year
 CREATE TABLE IF NOT EXISTS users (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   username      TEXT        NOT NULL UNIQUE,
-  password_hash TEXT        NOT NULL,
-  region_id     INTEGER     NOT NULL REFERENCES regions(id) CHECK (region_id <> 0),
-  gender_id     INTEGER     NOT NULL REFERENCES genders(id) CHECK (gender_id <> 3),
-  age_group_id  INTEGER     NOT NULL REFERENCES age_groups(id) CHECK (age_group_id <> 99),
+  github_id     VARCHAR(255) UNIQUE,
+  password_hash TEXT,
+  region_id     INTEGER     REFERENCES regions(id) CHECK (region_id <> 0),
+  gender_id     INTEGER     REFERENCES genders(id) CHECK (gender_id <> 3),
+  age_group_id  INTEGER     REFERENCES age_groups(id) CHECK (age_group_id <> 99),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
