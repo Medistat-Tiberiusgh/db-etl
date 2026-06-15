@@ -12,27 +12,22 @@ from dotenv import load_dotenv
 
 
 @dataclass(frozen=True)
-class SqlConfig:
-    uri: str = field(repr=False)
-
-
-@dataclass(frozen=True)
-class EtlConfig:
+class Config:
     data_dir: str
+    database_uri: str = field(repr=False)
     chunk_size: int = 100_000
-    sql: SqlConfig = field(default_factory=lambda: SqlConfig(uri=""))
 
 
-def load_config() -> EtlConfig:
+def load_config() -> Config:
     """Build configuration from environment variables."""
     load_dotenv()
 
-    sql_uri = (
+    database_uri = (
         f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
         f"@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}"
     )
-    return EtlConfig(
+    return Config(
         data_dir=os.environ.get("DATA_DIR", "/data"),
+        database_uri=database_uri,
         chunk_size=int(os.environ.get("CHUNK_SIZE", "100000")),
-        sql=SqlConfig(uri=sql_uri),
     )

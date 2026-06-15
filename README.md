@@ -36,8 +36,8 @@ The CSV files are **not** baked into the Docker image. Instead, the `data/` dire
 ## Key design decisions
 
 - **Chunked reading** — each CSV is streamed in configurable chunks so files larger than available RAM can be processed.
-- **Context-manager support** — loaders implement `__enter__`/`__exit__` for automatic resource cleanup.
-- **Composable transforms** — each transform is a pure function `DataFrame → DataFrame`, easy to test and extend. The dataset is pre-processed and clean, so only column normalisation is applied at load time.
+- **Context-manager support** — `PostgresLoader` implements `__enter__`/`__exit__` so the connection pool is disposed automatically.
+- **Targeted load-time cleaning** — the source CSVs are already filtered and renamed by the preprocessing script, so the only fix needed at load time is converting the Swedish decimal format in `per_1000` (`"2,68"` → `2.68`) so PostgreSQL `COPY` can parse it into a `NUMERIC` column.
 - **Environment-based config** — secrets stay out of source code; different environments just set different env vars.
 - **Directory-based loading** — the pipeline scans `DATA_DIR` for all `.csv` files and loads each into its own table, so adding a new file requires no code changes.
 - **Single compose file** — `docker-compose.yml` covers both local dev and deployment using the same `seed` service via `docker compose run`.

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/tiberius/Developer/repos/gitlab/1dv027/api-design/src/user/users/**)",
+      "Bash(cd /Users/tiberius/Developer/repos/gitlab/1dv027/api-design && ls -R src/user src/database 2>/dev/null | grep -v node_modules && echo \"---CALLERS---\" && grep -rn \"githubCallback\\\\|createFromGithub\\\\|findByGithubId\\\\|findByUsername\" src --include=\"*.ts\" | grep -v node_modules)",
+      "Read(//Users/tiberius/Developer/repos/gitlab/1dv027/api-design/**)"
+    ]
+  }
+}

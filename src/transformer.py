@@ -1,34 +1,20 @@
 """
-Data-cleaning transformations applied to each chunk.
+Data cleaning applied to each chunk before loading.
 
-Each public function takes a DataFrame and returns a new DataFrame,
-making them easy to compose, test, and extend independently.
+The source CSVs are already filtered, renamed, and lowercased by
+scripts/preprocessing.py. The only thing left to fix at load time is the
+Swedish decimal format in the per_1000 column ("2,68" → 2.68), which
+PostgreSQL COPY cannot parse into a NUMERIC column.
 """
 
 import pandas as pd
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Lowercase column names and strip surrounding whitespace."""
-    df = df.copy()
-    df.columns = [col.strip().lower() for col in df.columns]
-    return df
-
-
-def coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """Fix locale-formatted floats (e.g. '0,01' → 0.01) that pandas reads as strings."""
-    df = df.copy()
-    for col in df.select_dtypes(include="object").columns:
-        converted = df[col].str.replace(",", ".", regex=False)
-        try:
-            df[col] = pd.to_numeric(converted)
-        except (ValueError, TypeError):
-            pass
-    return df
-
-
 def apply_transforms(df: pd.DataFrame) -> pd.DataFrame:
-    """Run the full transformation pipeline on a single chunk."""
-    df = normalize_columns(df)
-    df = coerce_numeric(df)
+    """Convert the Swedish-formatted per_1000 rate to a real number, if present."""
+    if "per_1000" not in df.columns:
+        return df
+
+    df = df.copy()
+    df["per_1000"] = pd.to_numeric(df["per_1000"].str.replace(",", ".", regex=False))
     return df

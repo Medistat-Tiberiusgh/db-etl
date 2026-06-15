@@ -12,9 +12,8 @@ import logging
 from pathlib import Path
 
 from src.config import load_config
-from src.loaders import SqlLoader
 from src.pipeline import run
-from src.transformer import apply_transforms
+from src.postgres_loader import PostgresLoader
 
 
 def main() -> None:
@@ -34,17 +33,9 @@ def main() -> None:
     for csv_file in csv_files:
         table = csv_file.stem
         log.info("Processing %s → table '%s'", csv_file.name, table)
-        loader = SqlLoader(uri=config.sql.uri, table=table)
-        try:
-            total = run(
-                csv_path=str(csv_file),
-                chunk_size=config.chunk_size,
-                loaders=[loader],
-                transform=apply_transforms,
-            )
-            log.info("Done — %d rows loaded into '%s'", total, table)
-        finally:
-            loader.close()
+        with PostgresLoader(uri=config.database_uri, table=table) as loader:
+            total = run(str(csv_file), config.chunk_size, loader)
+        log.info("Done — %d rows loaded into '%s'", total, table)
 
 
 if __name__ == "__main__":

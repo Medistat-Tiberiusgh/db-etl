@@ -1,4 +1,4 @@
-"""SQL loader using SQLAlchemy (PostgreSQL, MySQL, SQLite, etc.)."""
+"""Loads DataFrames into PostgreSQL via the COPY protocol."""
 
 import io
 import logging
@@ -6,13 +6,11 @@ import logging
 import pandas as pd
 from sqlalchemy import create_engine, Engine
 
-from .base import Loader
-
 logger = logging.getLogger(__name__)
 
 
-class SqlLoader(Loader):
-    """Load DataFrames into a SQL table via PostgreSQL COPY protocol."""
+class PostgresLoader:
+    """Bulk-load DataFrames into a Postgres table using COPY FROM STDIN."""
 
     def __init__(self, uri: str, table: str) -> None:
         self._engine: Engine = create_engine(uri)
@@ -37,8 +35,15 @@ class SqlLoader(Loader):
             raw_conn.close()
 
         self._total += rows
-        logger.info("Copied %d rows into SQL table '%s' (total %d)", rows, self._table, self._total)
+        logger.info("Copied %d rows into '%s' (total %d)", rows, self._table, self._total)
 
     def close(self) -> None:
         self._engine.dispose()
-        logger.info("SQL connection pool disposed")
+        logger.info("Postgres connection pool disposed")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
