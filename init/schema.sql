@@ -8,6 +8,9 @@
 -- Lookup tables are loaded before prescription_data (enforced by ETL load order),
 -- so foreign key constraints are safe to use here.
 
+-- Case-insensitive text, used for email so comparisons ignore case.
+CREATE EXTENSION IF NOT EXISTS citext;
+
 -- -----------------------------------------------------------------------------
 -- Lookup tables
 -- -----------------------------------------------------------------------------
@@ -87,16 +90,59 @@ CREATE INDEX IF NOT EXISTS idx_prescription_data_atc_year
 -- -----------------------------------------------------------------------------
 -- User table
 -- -----------------------------------------------------------------------------
+-- Authentication is OAuth-only (GitHub, Google), with passkeys added after
+-- signup. Every user enters through an OIDC provider that supplies a verified
+-- email, so email is NOT NULL. Login methods live in auth_identities; the
+-- display name is taken live from the provider profile, so it is not stored.
 CREATE TABLE IF NOT EXISTS users (
-  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  username      TEXT        NOT NULL UNIQUE,
-  github_id     VARCHAR(255) UNIQUE,
-  password_hash TEXT,
-  region_id     INTEGER     REFERENCES regions(id) CHECK (region_id <> 0),
-  gender_id     INTEGER     REFERENCES genders(id) CHECK (gender_id <> 3),
-  age_group_id  INTEGER     REFERENCES age_groups(id) CHECK (age_group_id <> 99),
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           CITEXT      NOT NULL UNIQUE,
+  email_verified  BOOLEAN     NOT NULL DEFAULT FALSE,
+  region_id       INTEGER     REFERENCES regions(id) CHECK (region_id <> 0),
+  gender_id       INTEGER     REFERENCES genders(id) CHECK (gender_id <> 3),
+  age_group_id    INTEGER     REFERENCES age_groups(id) CHECK (age_group_id <> 99),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- -----------------------------------------------------------------------------
+-- Auth identities (OIDC providers only)
+-- -----------------------------------------------------------------------------
+-- One row per external login a user has linked. provider_uid is the stable
+-- subject id from that provider (GitHub id, Google sub). Linking a second
+-- provider to an existing account is done by matching the provider's
+-- verified-email claim against users.email.
+--
+-- Passkeys do NOT belong here: a WebAuthn credential is not a
+-- (provider, provider_uid) pair. They get their own table (see stub below).
+CREATE TABLE IF NOT EXISTS auth_identities (
+  id            SERIAL      PRIMARY KEY,
+  user_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider      TEXT        NOT NULL,   -- 'github', 'google'
+  provider_uid  TEXT        NOT NULL,   -- the provider's stable subject id
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (provider, provider_uid)
+);
+
+-- List all identities for a user (e.g. account settings page).
+CREATE INDEX IF NOT EXISTS idx_auth_identities_user_id
+    ON auth_identities (user_id);
+
+-- -----------------------------------------------------------------------------
+-- WebAuthn credentials (passkeys) — added later
+-- -----------------------------------------------------------------------------
+-- Passkeys carry more state than an OIDC identity: credential_id, public_key,
+-- a sign_count replay counter updated on every login, transports, and AAGUID.
+-- Model them separately when the feature lands, e.g.:
+--
+-- CREATE TABLE webauthn_credentials (
+--   id             SERIAL      PRIMARY KEY,
+--   user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--   credential_id  BYTEA       NOT NULL UNIQUE,
+--   public_key     BYTEA       NOT NULL,
+--   sign_count     BIGINT      NOT NULL DEFAULT 0,
+--   transports     TEXT[],
+--   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- );
 
 -- -----------------------------------------------------------------------------
 -- UserMedication table
