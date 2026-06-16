@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://sdb.socialstyrelsen.se/api/v1/sv/lakemedel"
 
+# The API runs on IIS, which rejects URL path segments over ~260 chars with a 400; ATC codes are 8 chars each (7 + comma), so cap the batch well under that.
+MAX_ATC_PER_REQUEST = 30
+
 # API measure id -> our column. One measure per request (the API rejects lists).
 MEASURES = {
     3: "num_prescriptions",
@@ -49,7 +52,7 @@ class SocialstyrelsenApi:
     def __init__(
         self,
         base_url: str = BASE_URL,
-        atc_batch_size: int = 50,
+        atc_batch_size: int = MAX_ATC_PER_REQUEST,
         max_retries: int = 4,
         timeout: int = 60,
     ) -> None:

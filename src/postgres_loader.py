@@ -3,11 +3,20 @@
 import io
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 import pandas as pd
 from sqlalchemy import create_engine, Engine
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class YearLoad:
+    """Outcome of replacing one year: rows removed and rows written."""
+
+    deleted: int
+    inserted: int
 
 
 class PostgresLoader:
@@ -31,7 +40,7 @@ class PostgresLoader:
         self._total += rows
         logger.info("Copied %d rows into '%s' (total %d)", rows, self._table, self._total)
 
-    def replace_year(self, year: int, chunks: Iterable[pd.DataFrame]) -> int:
+    def replace_year(self, year: int, chunks: Iterable[pd.DataFrame]) -> YearLoad:
         """
         Atomically replace one year of data: delete the year, then COPY the new
         chunks, all in a single transaction. Idempotent and re-runnable, which
@@ -60,7 +69,7 @@ class PostgresLoader:
             "Replaced year %d in '%s': deleted %d, inserted %d",
             year, self._table, deleted, inserted,
         )
-        return inserted
+        return YearLoad(deleted=deleted, inserted=inserted)
 
     def _copy(self, cursor, df: pd.DataFrame) -> int:
         """COPY one DataFrame into the table on an open cursor; returns row count."""
