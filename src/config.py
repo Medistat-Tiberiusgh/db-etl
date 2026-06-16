@@ -16,10 +16,11 @@ class Config:
     data_dir: str
     database_uri: str = field(repr=False)
     chunk_size: int = 100_000
+    discord_webhook_url: str | None = field(default=None, repr=False)
 
 
 def load_config() -> Config:
-    """Build configuration from environment variables."""
+    """Build configuration from environment variables (loaded from .env)."""
     load_dotenv()
 
     database_uri = (
@@ -30,4 +31,5 @@ def load_config() -> Config:
         data_dir=os.environ.get("DATA_DIR", "/data"),
         database_uri=database_uri,
         chunk_size=int(os.environ.get("CHUNK_SIZE", "100000")),
+        discord_webhook_url=os.environ.get("DISCORD_WEBHOOK_URL") or None,
     )
