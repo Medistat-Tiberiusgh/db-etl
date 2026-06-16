@@ -26,11 +26,11 @@ class DiscordNotifier:
     def success(self, description: str, fields: list[dict] | None = None) -> None:
         self._send("📊 New prescription data ingested", description, GREEN, fields)
 
-    def error(self, description: str) -> None:
-        self._send("❌ Prescription ingest failed", description, RED)
+    def error(self, description: str, fields: list[dict] | None = None) -> None:
+        self._send("❌ Prescription ingest failed", description, RED, fields)
 
-    def info(self, description: str) -> None:
-        self._send("ℹ️ Prescription ingest", description, BLUE)
+    def info(self, description: str, fields: list[dict] | None = None) -> None:
+        self._send("ℹ️ Prescription ingest", description, BLUE, fields)
 
     def _send(
         self,
