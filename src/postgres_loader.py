@@ -46,6 +46,11 @@ class PostgresLoader:
         chunks, all in a single transaction. Idempotent and re-runnable, which
         is what makes the yearly API ingest safe (and handles source revisions).
 
+        Refuses to commit if the chunks yielded zero rows: a published year is
+        never empty, so 0 rows means the source fetch failed — and replacing the
+        year anyway would wipe good data. Raising instead rolls the whole thing
+        back, leaving the existing year intact.
+
         Used by the API path; the bulk CSV seed keeps using load() unchanged.
         Assumes the target table has a `year` column (i.e. prescription_data).
         """
@@ -58,6 +63,11 @@ class PostgresLoader:
                 for chunk in chunks:
                     if not chunk.empty:
                         inserted += self._copy(cursor, chunk)
+                if inserted == 0:
+                    raise ValueError(
+                        f"Refusing to replace year {year}: 0 rows extracted — "
+                        "the source fetch almost certainly failed. Keeping existing data."
+                    )
             raw_conn.commit()
         except Exception:
             raw_conn.rollback()

@@ -32,6 +32,14 @@ class DiscordNotifier:
     def info(self, description: str, fields: list[dict] | None = None) -> None:
         self._send("ℹ️ Prescription ingest", description, BLUE, fields)
 
+    def online(self, description: str) -> None:
+        """Scheduler came up (sent on container start)."""
+        self._send("🟢 Scheduler online", description, GREEN)
+
+    def offline(self, description: str) -> None:
+        """Scheduler is going down (sent on SIGTERM/SIGINT, e.g. docker stop)."""
+        self._send("🔴 Scheduler offline", description, RED)
+
     def _send(
         self,
         title: str,
