@@ -15,6 +15,7 @@ lookup is upserted here.
 import logging
 import time
 
+import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -44,18 +45,9 @@ def run_ingest() -> None:
         new_years = list(range(database_year + 1, latest_year + 1))
 
         if not new_years:
+            # Quiet by design: the routine weekly "nothing new" check must not
+            # ping Discord — only real ingests and failures are worth notifying.
             logger.info("No new data — database and API both at %d", database_year)
-            minimum_year, maximum_year = year_span(engine)
-            notifier.info(
-                f"No new data — database and API are both at **{database_year}**.",
-                fields=[
-                    {"name": "Database year", "value": str(database_year), "inline": True},
-                    {"name": "Latest API year", "value": str(latest_year), "inline": True},
-                    {"name": "Coverage", "value": f"{minimum_year}–{maximum_year}", "inline": True},
-                    {"name": "Prescription rows", "value": f"{count_rows(engine):,}", "inline": True},
-                    {"name": "Drugs", "value": f"{count_drugs(engine):,}", "inline": True},
-                ],
-            )
             return
 
         logger.info("New years to ingest: %s (db=%d, api=%d)", new_years, database_year, latest_year)
@@ -132,9 +124,57 @@ def ingest_year(
     year: int,
     atc_codes: list[str],
 ) -> YearLoad:
-    """Transform each API chunk and atomically replace the year in the database."""
-    chunks = (apply_transforms(chunk) for chunk in api.fetch_year(year, atc_codes))
+    """Clean each API chunk, add the all-ages totals, and replace the year."""
+    chunks = (
+        add_age_totals(apply_transforms(chunk))
+        for chunk in api.fetch_year(year, atc_codes)
+    )
     return loader.replace_year(year, chunks)
+
+
+def add_age_totals(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add the age_group = 99 ("Totalt") all-ages roll-up that the API omits.
+
+    The API's age dimension only has bands 1–18 — there is no "Totalt" total
+    (the bulk CSV export ships one, the API does not), yet the dashboard's
+    default views read age_group = 99. So we synthesise it here, on the API
+    path only — never in the shared CSV transform, whose years already carry
+    age=99 and would otherwise be double-counted.
+
+    Per (year, region, atc, gender):
+      - num_prescriptions / num_patients are exact sums of the bands. A person
+        falls in exactly one age band per year, so summing patients does not
+        double-count.
+      - per_1000 is a rate and cannot be summed. We back out each band's
+        population (prescriptions / rate) and recompute the rate against the
+        summed population. Validated against the live data: the implied
+        population matches Sweden's, so this is a faithful re-derivation —
+        exact for the counts, within rounding for the rate.
+    """
+    if df.empty:
+        return df
+
+    keys = ["year", "region", "atc", "gender"]
+    bands = df.copy()
+    bands["num_prescriptions"] = pd.to_numeric(bands["num_prescriptions"])
+    bands["num_patients"] = pd.to_numeric(bands["num_patients"])
+
+    totals = bands.groupby(keys, as_index=False).agg(
+        num_prescriptions=("num_prescriptions", "sum"),
+        num_patients=("num_patients", "sum"),
+    )
+
+    rated = bands[bands["per_1000"] > 0].copy()
+    rated["population"] = rated["num_prescriptions"] * 1000 / rated["per_1000"]
+    population = rated.groupby(keys, as_index=False)["population"].sum()
+
+    totals = totals.merge(population, on=keys, how="left")
+    totals["per_1000"] = (totals["num_prescriptions"] * 1000 / totals["population"]).round(2)
+    totals["per_1000"] = totals["per_1000"].fillna(0)
+    totals["age_group"] = 99
+
+    return pd.concat([bands, totals[bands.columns]], ignore_index=True)
 
 
 def upsert_drugs(engine: Engine, name_by_atc: dict[str, str]) -> int:
