@@ -2,7 +2,7 @@
 Always-on scheduler entrypoint for the yearly ingest.
 
 This is the long-running container command. It runs the idempotent ingest every
-Sunday at 03:30 (Europe/Stockholm). The ingest can also be run one-shot, outside
+Sunday at 06:00 (Europe/Stockholm). The ingest can also be run one-shot, outside
 the schedule, via `python -m api_ingest`.
 
 It also reports its own lifecycle to Discord: "online" on start, and "offline"
@@ -24,7 +24,12 @@ from src.discord_notifier import DiscordNotifier
 
 logger = logging.getLogger(__name__)
 
-SCHEDULE_DESCRIPTION = "every Sunday at 03:30 Europe/Stockholm"
+SCHEDULE_TIMEZONE = "Europe/Stockholm"
+SCHEDULE_DAY_OF_WEEK = "sun"
+SCHEDULE_HOUR = 6
+SCHEDULE_MINUTE = 0
+
+SCHEDULE_DESCRIPTION = f"every Sunday at {SCHEDULE_HOUR:02d}:{SCHEDULE_MINUTE:02d} {SCHEDULE_TIMEZONE}"
 
 
 def main() -> None:
@@ -37,10 +42,10 @@ def main() -> None:
     notify_offline_on_shutdown(notifier)
     notifier.online(f"Scheduler started — running the ingest {SCHEDULE_DESCRIPTION}.")
 
-    scheduler = BlockingScheduler(timezone="Europe/Stockholm")
+    scheduler = BlockingScheduler(timezone=SCHEDULE_TIMEZONE)
     scheduler.add_job(
         run_ingest,
-        CronTrigger(day_of_week="sun", hour=6, minute=0),
+        CronTrigger(day_of_week=SCHEDULE_DAY_OF_WEEK, hour=SCHEDULE_HOUR, minute=SCHEDULE_MINUTE),
         id="weekly-ingest",
         misfire_grace_time=3600,
         coalesce=True,
