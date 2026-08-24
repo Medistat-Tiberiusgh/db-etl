@@ -40,10 +40,8 @@ def main() -> None:
     scheduler = BlockingScheduler(timezone="Europe/Stockholm")
     scheduler.add_job(
         run_ingest,
-        CronTrigger(day_of_week="sun", hour=3, minute=30),
+        CronTrigger(day_of_week="sun", hour=6, minute=0),
         id="weekly-ingest",
-        # If the container was down at 03:30, still run when it comes back
-        # within the hour, and collapse multiple missed runs into one.
         misfire_grace_time=3600,
         coalesce=True,
     )
